@@ -10,19 +10,19 @@ on:
       MANIFEST_BRANCH:
         description: 'MANIFEST_BRANCH'
         required: true
-        default: '11.0'
+        default: '12.1'
       DEVICE_TREE_URL:
         description: 'DEVICE_TREE_URL'
         required: true
-        default: 'https://github.com/OrangeFoxRecovery/device_xiaomi_garden'
+        default: 'https://github.com/Optimizadorww/recovery_device_tecno_BG7.git'
       DEVICE_TREE_BRANCH:
         description: 'DEVICE_TREE_BRANCH'
         required: true
-        default: 'fox_11.0_Q'
+        default: 'fox-12.1'
       DEVICE_PATH:
         description: 'DEVICE_PATH'
         required: true
-        default: 'device/xiaomi/garden'
+        default: 'device_tecno_BG7'
       COMMON_TREE_URL:
         description: 'COMMON_TREE_URL (if no common tree, leave blank)'
         required: false
@@ -32,15 +32,15 @@ on:
       DEVICE_NAME:
         description: 'DEVICE_NAME'
         required: true
-        default: 'garden'
+        default: 'BG7'
       MAKEFILE_NAME:
         description: 'MAKEFILE_NAME'
         required: true
-        default: 'twrp_garden'
+        default: 'twrp_BG7'
       BUILD_TARGET:
         description: 'BUILD_TARGET'
         required: true
-        default: 'recovery'
+        default: 'vendor_boot'
 
 jobs:
   build:
