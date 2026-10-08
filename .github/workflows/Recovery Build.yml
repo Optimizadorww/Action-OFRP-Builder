@@ -167,7 +167,6 @@ jobs:
         with:
           distribution: zulu
           java-version: "11"
-          cache: gradle
 
       - name: 🔐 Setup SSH keys
         if: ${{ startsWith(inputs.SYNC_URL, 'git@github.com') || startsWith(inputs.DEVICE_TREE_URL, 'git@github.com') || startsWith(inputs.COMMON_TREE_URL, 'git@github.com') }}
@@ -304,7 +303,7 @@ jobs:
           Manifest:         ${{ inputs.MANIFEST_BRANCH }}
           Device Tree:      ${{ inputs.DEVICE_TREE_BRANCH }}
           Build Target:     ${{ inputs.BUILD_TARGET }}
-          Build Type:       eng
+          Build Type:       Stable
           Build Date:       ${BUILD_DATE}
           GitHub Run:       ${{ github.run_number }}
           GitHub Run ID:    ${{ github.run_id }}
