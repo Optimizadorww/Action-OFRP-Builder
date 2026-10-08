@@ -22,7 +22,7 @@ on:
       DEVICE_PATH:
         description: 'DEVICE_PATH'
         required: true
-        default: 'device_tecno_BG7'
+        default: 'device/tecno/BG7'
       COMMON_TREE_URL:
         description: 'COMMON_TREE_URL (if no common tree, leave blank)'
         required: false
@@ -32,7 +32,7 @@ on:
       DEVICE_NAME:
         description: 'DEVICE_NAME'
         required: true
-        default: 'TECNO-BG7'
+        default: 'BG7'
       MAKEFILE_NAME:
         description: 'MAKEFILE_NAME'
         required: true
