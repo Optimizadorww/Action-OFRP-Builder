@@ -1,388 +1,153 @@
-name: 🦊 OrangeFox Recovery Build
-
-run-name: "🦊 OrangeFox ${{ inputs.ORANGEFOX_VERSION }} • ${{ inputs.DEVICE_NAME }} • ${{ inputs.BUILD_CHANNEL }}"
+name: Recovery Build
 
 on:
   workflow_dispatch:
     inputs:
       SYNC_URL:
-        description: "OrangeFox sync repository"
+        description: 'SYNC_URL'
         required: true
-        type: string
-        default: "https://gitlab.com/OrangeFox/sync.git"
-
+        default: 'https://gitlab.com/OrangeFox/sync.git'
       MANIFEST_BRANCH:
-        description: "OrangeFox manifest branch"
+        description: 'MANIFEST_BRANCH'
         required: true
-        type: string
-        default: "12.1"
-
-      ORANGEFOX_VERSION:
-        description: "OrangeFox version"
-        required: true
-        type: string
-        default: "R12.1"
-
-      BUILD_CHANNEL:
-        description: "Release channel"
-        required: true
-        type: choice
-        options:
-          - Stable
-          - Beta
-          - Testing
-        default: Stable
-
-      MAINTAINER:
-        description: "Maintainer name"
-        required: true
-        type: string
-        default: "Ryuu"
-
+        default: '12.1'
       DEVICE_TREE_URL:
-        description: "Device tree repository"
+        description: 'DEVICE_TREE_URL'
         required: true
-        type: string
-        default: "https://github.com/Optimizadorww/recovery_device_tecno_BG7.git"
-
+        default: 'https://github.com/Optimizadorww/recovery_device_tecno_BG7.git'
       DEVICE_TREE_BRANCH:
-        description: "Device tree branch"
+        description: 'DEVICE_TREE_BRANCH'
         required: true
-        type: string
-        default: "fox-12.1"
-
+        default: 'fox-12.1'
       DEVICE_PATH:
-        description: "Device tree path"
+        description: 'DEVICE_PATH'
         required: true
-        type: string
-        default: "device/tecno/BG7"
-
+        default: 'device/tecno/BG7'
       COMMON_TREE_URL:
-        description: "Common tree URL (leave blank if not used)"
+        description: 'COMMON_TREE_URL (if no common tree, leave blank)'
         required: false
-        type: string
-        default: ""
-
       COMMON_PATH:
-        description: "Common tree path (leave blank if not used)"
+        description: 'COMMON_PATH (if no common tree, leave blank)'
         required: false
-        type: string
-        default: ""
-
       DEVICE_NAME:
-        description: "Device codename"
+        description: 'DEVICE_NAME'
         required: true
-        type: string
-        default: "BG7"
-
+        default: 'BG7'
       MAKEFILE_NAME:
-        description: "Recovery product makefile"
+        description: 'MAKEFILE_NAME'
         required: true
-        type: string
-        default: "twrp_BG7"
-
+        default: 'twrp_BG7'
       BUILD_TARGET:
-        description: "Android build target prefix"
+        description: 'BUILD_TARGET'
         required: true
-        type: string
-        default: "vendorboot"
-
-      ANDROID_VERSION:
-        description: "Android version"
-        required: true
-        type: string
-        default: "12.1"
+        default: 'vendorboot'
 
 jobs:
   build:
-    name: "🦊 Build ${{ inputs.DEVICE_NAME }}"
     if: github.event.repository.owner.id == github.event.sender.id
     runs-on: ubuntu-24.04
-    timeout-minutes: 180
-
     permissions:
       contents: write
-
     steps:
-      - name: 📥 Checkout workflow
-        uses: actions/checkout@v6
+ 
+    # You might want to Checkout your repo first, but not mandatory
+    - name: Check Out
+      uses: actions/checkout@v7
 
-      - name: 🧹 Cleanup runner
-        uses: rokibhasansagar/slimhub_actions@main
+    # Cleanup The Actions Workspace Using Custom Composite Run Actions
+    - name: Cleanup
+      uses: rokibhasansagar/slimhub_actions@main
 
-      - name: 📁 Initialize workspace
-        id: workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p workspace
-          WORKSPACE="$(pwd)/workspace"
-          echo "workspace-folder=${WORKSPACE}" >> "$GITHUB_OUTPUT"
-          echo "Workspace: ${WORKSPACE}"
+    - name: Initialize workspace
+      run: |
+        mkdir workspace
+        cd workspace
+        echo "workspace-folder=$(pwd)" >> $GITHUB_OUTPUT
+      id: pwd
 
-      - name: 🧰 Prepare build environment
-        working-directory: ${{ steps.workspace.outputs.workspace-folder }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          sudo apt update
-          sudo apt upgrade -y
-
-          DEBIAN_FRONTEND=noninteractive sudo apt install -yq \
+    - name: Prepare the build environment
+      run: |
+        sudo apt update && sudo apt upgrade -y
+        DEBIAN_FRONTEND=noninteractive sudo apt install -yq \
             linux-modules-extra-$(uname -r) \
-            git \
-            python3 \
-            tar \
-            aria2 \
-            unzip \
-            zip \
-            bc \
-            bison \
-            build-essential \
-            ccache \
-            curl \
-            flex \
-            g++ \
-            gcc \
-            gnupg \
-            libssl-dev \
-            lzop \
-            rsync \
-            schedtool \
-            squashfs-tools \
-            wget \
-            xz-utils
+            git python3 tar aria2
+        git clone https://gitlab.com/OrangeFox/misc/scripts
+        cd scripts
+        sudo bash setup/android_build_env.sh
+        sed -i 's/cd -/cd ../g' setup/install_android_sdk.sh
+        sudo bash setup/install_android_sdk.sh
+      working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
-          git clone https://gitlab.com/OrangeFox/misc/scripts
-          cd scripts
+    - name: Install OpenJDK
+      uses: actions/setup-java@v6
+      with:
+        distribution: 'zulu'
+        java-version: '11'
 
-          sudo bash setup/android_build_env.sh
+    - name: Setup SSH Keys
+      if: ${{ startsWith(github.event.inputs.SYNC_URL, 'git@github.com') || 
+          startsWith(github.event.inputs.DEVICE_TREE_URL, 'git@github.com') ||
+          startsWith(github.event.inputs.COMMON_TREE_URL, 'git@github.com') }}
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+          ssh-private-key: |
+            ${{ secrets.SSH_PRIVATE_KEY }}
 
-          sed -i 's/cd -/cd ../g' setup/install_android_sdk.sh
-          sudo bash setup/install_android_sdk.sh
+    - name: Sync OrangeFox sources and minimal manifest
+      run: |
+        cd ${{ steps.pwd.outputs.workspace-folder }}
+        git clone ${{ github.event.inputs.SYNC_URL }}
+        cd sync
+        ./orangefox_sync.sh --branch ${{ github.event.inputs.MANIFEST_BRANCH }} --path ${{ steps.pwd.outputs.workspace-folder }}/fox_${{ github.event.inputs.MANIFEST_BRANCH }}
+      working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
-      - name: ☕ Install OpenJDK 11
-        uses: actions/setup-java@v6
-        with:
-          distribution: zulu
-          java-version: "11"
+    - name: Clone device tree
+      run: |
+        cd ${{ steps.pwd.outputs.workspace-folder }}/fox_${{ github.event.inputs.MANIFEST_BRANCH }}
+        git clone ${{ github.event.inputs.DEVICE_TREE_URL }} -b ${{ github.event.inputs.DEVICE_TREE_BRANCH }} ./${{ github.event.inputs.DEVICE_PATH }}
+      working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
-      - name: 🔐 Setup SSH keys
-        if: ${{ startsWith(inputs.SYNC_URL, 'git@github.com') || startsWith(inputs.DEVICE_TREE_URL, 'git@github.com') || startsWith(inputs.COMMON_TREE_URL, 'git@github.com') }}
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+    - name: Clone common tree
+      if: |
+        github.event.inputs.COMMON_TREE_URL != ''
+        && github.event.inputs.COMMON_PATH != ''
+      run: |
+        cd ${{ steps.pwd.outputs.workspace-folder }}/fox_${{ github.event.inputs.MANIFEST_BRANCH }}
+        git clone ${{ github.event.inputs.COMMON_TREE_URL }} -b ${{ github.event.inputs.DEVICE_TREE_BRANCH }} ./${{ github.event.inputs.COMMON_PATH }}
+      working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
-      - name: 🦊 Sync OrangeFox sources
-        working-directory: ${{ steps.workspace.outputs.workspace-folder }}
-        shell: bash
-        run: |
-          set -euo pipefail
+    - name: Set Swap Space
+      uses: pierotofy/set-swap-space@master
+      with:
+        swap-size-gb: 12
 
-          git clone "${{ inputs.SYNC_URL }}"
-          cd sync
+    - name: Building recovery
+      run: |
+        cd ${{ steps.pwd.outputs.workspace-folder }}/fox_${{ github.event.inputs.MANIFEST_BRANCH }}
+        set +e
+        source build/envsetup.sh
+        export ALLOW_MISSING_DEPENDENCIES=true
+        set -e
+        lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng && make clean && mka adbd ${{ github.event.inputs.BUILD_TARGET }}image -j$(nproc --all)
+      working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
-          ./orangefox_sync.sh \
-            --branch "${{ inputs.MANIFEST_BRANCH }}" \
-            --path "${{ steps.workspace.outputs.workspace-folder }}/fox_${{ inputs.MANIFEST_BRANCH }}"
+    - name: Check the output directory before uploading
+      run: |
+        ls -al ${{ steps.pwd.outputs.workspace-folder }}/fox_${{ github.event.inputs.MANIFEST_BRANCH }}/out/target/product/
+        echo
+        ls -al ${{ steps.pwd.outputs.workspace-folder }}/fox_${{ github.event.inputs.MANIFEST_BRANCH }}/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/
 
-      - name: 📱 Clone device tree
-        working-directory: ${{ steps.workspace.outputs.workspace-folder }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          cd "${{ steps.workspace.outputs.workspace-folder }}/fox_${{ inputs.MANIFEST_BRANCH }}"
-
-          git clone \
-            "${{ inputs.DEVICE_TREE_URL }}" \
-            -b "${{ inputs.DEVICE_TREE_BRANCH }}" \
-            "./${{ inputs.DEVICE_PATH }}"
-
-      - name: 🧩 Clone common tree
-        if: ${{ inputs.COMMON_TREE_URL != '' && inputs.COMMON_PATH != '' }}
-        working-directory: ${{ steps.workspace.outputs.workspace-folder }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          cd "${{ steps.workspace.outputs.workspace-folder }}/fox_${{ inputs.MANIFEST_BRANCH }}"
-
-          git clone \
-            "${{ inputs.COMMON_TREE_URL }}" \
-            -b "${{ inputs.DEVICE_TREE_BRANCH }}" \
-            "./${{ inputs.COMMON_PATH }}"
-
-      - name: 💾 Configure swap
-        uses: pierotofy/set-swap-space@master
-        with:
-          swap-size-gb: 12
-
-      - name: 🔨 Build OrangeFox
-        working-directory: ${{ steps.workspace.outputs.workspace-folder }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          cd "${{ steps.workspace.outputs.workspace-folder }}/fox_${{ inputs.MANIFEST_BRANCH }}"
-
-          source build/envsetup.sh
-          export ALLOW_MISSING_DEPENDENCIES=true
-
-          lunch "${{ inputs.MAKEFILE_NAME }}-eng"
-          make clean
-
-          mka adbd \
-            "${{ inputs.BUILD_TARGET }}image" \
-            -j"$(nproc --all)"
-
-      - name: 🔎 Validate build output
-        id: output
-        working-directory: ${{ steps.workspace.outputs.workspace-folder }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          OUT="${{ steps.workspace.outputs.workspace-folder }}/fox_${{ inputs.MANIFEST_BRANCH }}/out/target/product/${{ inputs.DEVICE_NAME }}"
-
-          echo "Output directory:"
-          ls -lah "$OUT"
-
-          shopt -s nullglob
-          IMAGES=("$OUT"/*.img)
-          ZIPS=("$OUT"/*.zip)
-
-          if [ "${#IMAGES[@]}" -eq 0 ] && [ "${#ZIPS[@]}" -eq 0 ]; then
-            echo "::error::No .img or .zip files were generated."
-            exit 1
-          fi
-
-          echo "output-dir=$OUT" >> "$GITHUB_OUTPUT"
-
-      - name: 🧾 Generate SHA-256 checksums
-        working-directory: ${{ steps.output.outputs.output-dir }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          rm -f SHA256SUMS.txt
-
-          shopt -s nullglob
-          FILES=(
-            *.img
-            *.zip
-          )
-
-          if [ "${#FILES[@]}" -eq 0 ]; then
-            echo "::error::No release files found for checksum generation."
-            exit 1
-          fi
-
-          sha256sum "${FILES[@]}" | tee SHA256SUMS.txt
-
-      - name: 📝 Generate build information
-        working-directory: ${{ steps.output.outputs.output-dir }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          BUILD_DATE="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-          RELEASE_TAG="${{ inputs.ORANGEFOX_VERSION }}-${{ inputs.DEVICE_NAME }}-${{ inputs.BUILD_CHANNEL }}-$(date -u '+%Y%m%d')-${{ github.run_number }}"
-
-          cat > BUILD_INFO.txt <<EOF
-          ==========================================
-          OrangeFox Recovery Build
-          ==========================================
-
-          Device:           ${{ inputs.DEVICE_NAME }}
-          OrangeFox:        ${{ inputs.ORANGEFOX_VERSION }}
-          Android:          ${{ inputs.ANDROID_VERSION }}
-          Channel:          ${{ inputs.BUILD_CHANNEL }}
-          Maintainer:       ${{ inputs.MAINTAINER }}
-          Manifest:         ${{ inputs.MANIFEST_BRANCH }}
-          Device Tree:      ${{ inputs.DEVICE_TREE_BRANCH }}
-          Build Target:     ${{ inputs.BUILD_TARGET }}
-          Build Type:       Stable
-          Build Date:       ${BUILD_DATE}
-          GitHub Run:       ${{ github.run_number }}
-          GitHub Run ID:    ${{ github.run_id }}
-          Source Commit:    ${{ github.sha }}
-          Release Tag:      ${RELEASE_TAG}
-          ==========================================
-          EOF
-
-          echo "RELEASE_TAG=${RELEASE_TAG}" >> "$GITHUB_ENV"
-          echo "BUILD_DATE=${BUILD_DATE}" >> "$GITHUB_ENV"
-
-          cat BUILD_INFO.txt
-
-      - name: 📦 Package build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: OrangeFox-${{ inputs.ORANGEFOX_VERSION }}-${{ inputs.DEVICE_NAME }}-${{ inputs.BUILD_CHANNEL }}-${{ github.run_number }}
-          path: |
-            ${{ steps.output.outputs.output-dir }}/*.img
-            ${{ steps.output.outputs.output-dir }}/*.zip
-            ${{ steps.output.outputs.output-dir }}/SHA256SUMS.txt
-            ${{ steps.output.outputs.output-dir }}/BUILD_INFO.txt
-          if-no-files-found: error
-          retention-days: 30
-          compression-level: 6
-
-      - name: 🚀 Publish release
-        uses: softprops/action-gh-release@v3
-        with:
-          repository: Optimizadorww/OrangeFox-BG7-Releases
-          token: ${{ secrets.RELEASE_TOKEN }}
-          tag_name: ${{ env.RELEASE_TAG }}
-          name: "🦊 OrangeFox ${{ inputs.ORANGEFOX_VERSION }} • ${{ inputs.DEVICE_NAME }} • ${{ inputs.BUILD_CHANNEL }}"
-          draft: false
-          prerelease: ${{ inputs.BUILD_CHANNEL != 'Stable' }}
-          make_latest: ${{ inputs.BUILD_CHANNEL == 'Stable' }}
-          fail_on_unmatched_files: true
-          files: |
-            ${{ steps.output.outputs.output-dir }}/*.img
-            ${{ steps.output.outputs.output-dir }}/*.zip
-            ${{ steps.output.outputs.output-dir }}/SHA256SUMS.txt
-            ${{ steps.output.outputs.output-dir }}/BUILD_INFO.txt
-          body: |
-            # 🦊 OrangeFox Recovery
-
-            Official build for **${{ inputs.DEVICE_NAME }}**.
-
-            ## 📱 Build information
-
-            | Field | Value |
-            |---|---|
-            | Device | `${{ inputs.DEVICE_NAME }}` |
-            | OrangeFox | `${{ inputs.ORANGEFOX_VERSION }}` |
-            | Android | `${{ inputs.ANDROID_VERSION }}` |
-            | Channel | **${{ inputs.BUILD_CHANNEL }}** |
-            | Maintainer | **${{ inputs.MAINTAINER }}** |
-            | Manifest | `${{ inputs.MANIFEST_BRANCH }}` |
-            | Device tree | `${{ inputs.DEVICE_TREE_BRANCH }}` |
-            | Build target | `${{ inputs.BUILD_TARGET }}` |
-            | Build date | `${{ env.BUILD_DATE }}` |
-            | GitHub run | `#${{ github.run_number }}` |
-
-            ## 📦 Files
-
-            The release contains the generated recovery images/packages and their SHA-256 checksums.
-
-            ## 🔐 Verification
-
-            Check `SHA256SUMS.txt` before flashing any file.
-
-            ## ⚠️ Disclaimer
-
-            This is an unofficial OrangeFox build for the **TECNO BG7**.
-
-            Flashing custom recovery images can result in data loss, bootloops or an unbootable device. Verify the device model and the downloaded files before flashing.
-
-            **Use at your own risk.**
-
-            ---
-            Maintained by **${{ inputs.MAINTAINER }}**
-        env:
-          TZ: UTC
+    - name: Upload to Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          ${{ steps.pwd.outputs.workspace-folder }}/fox_${{ github.event.inputs.MANIFEST_BRANCH }}/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.img
+          ${{ steps.pwd.outputs.workspace-folder }}/fox_${{ github.event.inputs.MANIFEST_BRANCH }}/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.zip
+        name: ${{ github.event.inputs.DEVICE_NAME }}-${{ github.run_id }}
+        tag_name: ${{ github.run_id }}
+        body: |
+          Manifest: ${{ github.event.inputs.MANIFEST_BRANCH }}
+          Device: ${{ github.event.inputs.DEVICE_NAME }}
+          Target: ${{ github.event.inputs.BUILD_TARGET }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
