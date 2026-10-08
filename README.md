@@ -1,60 +1,201 @@
-# Build Recovery using Github Actions
+# 🦊 Action-Ofox-Builder
 
-- Support OrangeFox, [TWRP](https://github.com/azwhikaru/Action-TWRP-Builder) is here
-- [中文说明](./README_CN.md)
+GitHub Actions para compilar **OrangeFox Recovery** para el **TECNO BG7**.
 
----
-
-## Thanks to
-- All contributors
+Este proyecto automatiza la compilación de OrangeFox Recovery utilizando GitHub Actions y el árbol de dispositivo específico para el TECNO BG7.
 
 ---
 
-## Release Notes
+## 📱 Dispositivo
+
+| Información      | Detalle            |
+| ---------------- | ------------------ |
+| Fabricante       | TECNO              |
+| Modelo           | BG7                |
+| Recovery         | OrangeFox Recovery |
+| Versión          | R12.1 / OrangeFox  |
+| Arquitectura     | ARM64              |
+| Plataforma       | MediaTek MT6765    |
+| Tipo de recovery | `vendor_boot`      |
+| Android base     | Android 12.1       |
+
+---
+
+## ✨ Características
+
+* 🦊 Compilación automática de OrangeFox.
+* ⚙️ GitHub Actions totalmente automatizado.
+* 📦 Generación de `vendor_boot.img`.
+* 📦 Generación de `OrangeFox-R12.0-Unofficial-BG7.zip`.
+* 💾 Generación de `OrangeFox-R12.0-Unofficial-BG7.img`.
+* 🔧 Soporte para `fastbootd`.
+* 🚀 Compilación reproducible desde GitHub Actions.
+* 📋 Publicación automática de los archivos generados como artefactos/releases.
+
+---
+
+## 🏗️ Compilación
+
+El proyecto utiliza GitHub Actions para realizar la compilación.
+
+### 1. Clonar el repositorio
+
+```bash
+git clone https://github.com/Optimizadorww/Action-OFRP-Builder.git
+cd Action-OFRP-Builder
 ```
-= 2023/04/20
-- The first available version is submitted.
+
+### 2. Ejecutar GitHub Actions
+
+Desde GitHub:
+
+**Actions → Recovery Build → Run workflow**
+
+Selecciona los parámetros disponibles y ejecuta el workflow.
+
+La compilación se realizará automáticamente en los servidores de GitHub Actions.
+
+---
+
+## 📦 Archivos generados
+
+Al finalizar correctamente la compilación, se generan archivos similares a:
+
+```text
+OrangeFox-R12.0-Unofficial-BG7.img
+OrangeFox-R12.0-Unofficial-BG7.zip
+ramdisk.img
+vendor_boot.img
 ```
 
------
+Los archivos pueden encontrarse en los **Artifacts** de GitHub Actions o en la **Release** generada por el workflow.
 
-## Parameter Description
+---
 
-| Name | Description | Example |
-| ------------ | -------------------- | ------------ |
-| `SYNC_URL` | Script specified by OrangeFox | https://gitlab.com/OrangeFox/sync.git |
-| `MANIFEST_BRANCH` | Source branch | 12.1                                                         |
-| `DEVICE_TREE_URL` | Device address | https://github.com/OrangeFoxRecovery/device_xiaomi_laurel_sprout |
-| `DEVICE_TREE_BRANCH` | Device branch | fox_12.1 |
-| `DEVICE_PATH` | Device location | device/xiaomi/laurel_sprout |
-| `COMMON_TREE_URL` | Common tree address |  |
-| `COMMON_PATH` | Common tree location |  |
-| `DEVICE_NAME` | Model name | laurel_sprout |
-| `MAKEFILE_NAME` | Makefile name | twrp_laurel_sprout |
-| `BUILD_TARGET` | Build Target Partition (boot/recovery/vendorboot) | recovery |
+## ⚠️ Advertencia
 
------
+Este recovery es **no oficial** y está destinado al **TECNO BG7**.
 
-## How to use
+No flashees imágenes destinadas a otro dispositivo.
+
+Antes de modificar el dispositivo, asegúrate de:
+
+* Tener una copia de seguridad de tus datos.
+* Conocer el procedimiento de recuperación de tu dispositivo.
+* Verificar que el archivo corresponde exactamente a tu modelo.
+* Comprobar el hash SHA-256 de los archivos descargados cuando esté disponible.
+
+El uso de este proyecto es bajo tu propia responsabilidad.
+
+**Ni el autor del proyecto ni los colaboradores se responsabilizan por daños, pérdida de datos, bootloops o dispositivos inutilizados.**
+
+---
+
+## 🔧 Estructura del proyecto
+
+```text
+Action-OFRP-Builder/
+├── .github/
+│   └── workflows/
+│       └── Recovery_Build.yml
+├── README.md
+└── ...
 ```
-For example, your username is: JohnSmith
+
+El árbol del dispositivo utilizado durante la compilación se encuentra en:
+
+```text
+device/tecno/BG7
 ```
-#### 1. Click 'Fork' in the upper right corner of this repository
-![image](https://user-images.githubusercontent.com/37921907/177914706-c92476c5-7e14-4fb3-be94-0c8a11dae874.png)
-#### 2. After waiting for the automatic redirection, you will see your own username
-![image](https://user-images.githubusercontent.com/37921907/177915106-5bde6fc9-303c-479e-b290-22b48efd1e4e.png)
------
 
-## Building the Recovery
-#### 9. Click 'Actions-Recovery Build'
-![image](https://user-images.githubusercontent.com/37921907/177915304-8731ed80-1d49-48c9-9848-70d0ac8f2720.png)
-#### 10. Click 'Run workflow' and fill in according to the above 'parameter description'
-![image](https://user-images.githubusercontent.com/37921907/177915346-71c29149-78fb-4a00-996f-5d84ffc9eb8c.png)
-#### 11. After filling in, click 'Run workflow' to start running
+---
 
------
+## 🧩 Device Tree
 
-## Compilation results
-Can be downloaded at [Release](../../releases)
+El proyecto utiliza un device tree específico para:
 
-File not being uploaded to Release? Please check the step 'Check the output directory before uploading' and check the file name
+```text
+TECNO BG7
+```
+
+Configuración principal:
+
+```text
+TARGET_ARCH := arm64
+TARGET_BOARD_PLATFORM := mt6765
+TARGET_BOOTLOADER_BOARD_NAME := BG7
+```
+
+OrangeFox se integra como recovery dentro de `vendor_boot`.
+
+---
+
+## 🤖 GitHub Actions
+
+La compilación se realiza automáticamente mediante GitHub Actions.
+
+El workflow se encarga de:
+
+1. Preparar el entorno de compilación.
+2. Descargar el código necesario.
+3. Preparar el device tree.
+4. Configurar OrangeFox.
+5. Compilar el recovery.
+6. Generar las imágenes correspondientes.
+7. Calcular hashes SHA-256.
+8. Publicar los archivos generados.
+
+---
+
+## 📜 Créditos
+
+Gracias a todos los desarrolladores y proyectos de código abierto que hacen posible este proyecto.
+
+### OrangeFox Recovery
+
+Proyecto de recovery utilizado como base.
+
+### Android Open Source Project
+
+Base del sistema de compilación Android.
+
+### TeamWin Recovery Project
+
+Parte importante del ecosistema de recovery personalizado utilizado como base tecnológica.
+
+### GitHub Actions
+
+Infraestructura utilizada para automatizar las compilaciones.
+
+---
+
+## ❤️ Autor
+
+**Ryuu**
+
+Proyecto mantenido para el:
+
+**TECNO BG7**
+
+---
+
+## 📄 Licencia
+
+Este proyecto contiene componentes provenientes de diferentes proyectos de código abierto.
+
+Consulta las licencias correspondientes de cada componente antes de redistribuirlo.
+
+---
+
+## ⭐ Si este proyecto te resulta útil
+
+Si este proyecto te ayudó a compilar OrangeFox para tu dispositivo, puedes darle una ⭐ al repositorio.
+
+También puedes reportar problemas mediante **Issues** proporcionando:
+
+* Log completo de GitHub Actions.
+* Modelo exacto del dispositivo.
+* Versión de Android.
+* Archivo utilizado.
+* Error reproducible.
+* Información relevante del recovery.
