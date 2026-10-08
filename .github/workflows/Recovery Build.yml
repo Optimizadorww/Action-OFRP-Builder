@@ -52,7 +52,7 @@ jobs:
  
     # You might want to Checkout your repo first, but not mandatory
     - name: Check Out
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
 
     # Cleanup The Actions Workspace Using Custom Composite Run Actions
     - name: Cleanup
@@ -79,13 +79,13 @@ jobs:
       working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
     - name: Install OpenJDK
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v6
       with:
         distribution: 'zulu'
         java-version: '11'
 
     - name: Setup SSH Keys
-      if: ${{ startsWith(github.event.inputs.MANIFEST_URL, 'git@github.com') || 
+      if: ${{ startsWith(github.event.inputs.SYNC_URL, 'git@github.com') || 
           startsWith(github.event.inputs.DEVICE_TREE_URL, 'git@github.com') ||
           startsWith(github.event.inputs.COMMON_TREE_URL, 'git@github.com') }}
       uses: webfactory/ssh-agent@v0.9.0
@@ -109,8 +109,8 @@ jobs:
 
     - name: Clone common tree
       if: |
-        github.event.inputs.COMMON_TREE_URL != null
-        && github.event.inputs.COMMON_PATH != null
+        github.event.inputs.COMMON_TREE_URL != ''
+        && github.event.inputs.COMMON_PATH != ''
       run: |
         cd ${{ steps.pwd.outputs.workspace-folder }}/fox_${{ github.event.inputs.MANIFEST_BRANCH }}
         git clone ${{ github.event.inputs.COMMON_TREE_URL }} -b ${{ github.event.inputs.DEVICE_TREE_BRANCH }} ./${{ github.event.inputs.COMMON_PATH }}
@@ -130,7 +130,6 @@ jobs:
         set -e
         lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng && make clean && mka adbd ${{ github.event.inputs.BUILD_TARGET }}image -j$(nproc --all)
       working-directory: ${{ steps.pwd.outputs.workspace-folder }}
-      continue-on-error: true
 
     - name: Check the output directory before uploading
       run: |
