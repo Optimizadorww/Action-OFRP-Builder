@@ -24,11 +24,17 @@ on:
         required: true
         default: 'device/tecno/BG7'
       COMMON_TREE_URL:
-        description: 'COMMON_TREE_URL (if no common tree, leave blank)'
+        description: 'COMMON_TREE_URL (si no hay common tree, dejar vacío)'
         required: false
+        default: ''
+      COMMON_TREE_BRANCH:
+        description: 'COMMON_TREE_BRANCH (si no hay common tree, dejar vacío)'
+        required: false
+        default: ''
       COMMON_PATH:
-        description: 'COMMON_PATH (if no common tree, leave blank)'
+        description: 'COMMON_PATH (si no hay common tree, dejar vacío)'
         required: false
+        default: ''
       DEVICE_NAME:
         description: 'DEVICE_NAME'
         required: true
@@ -41,113 +47,255 @@ on:
         description: 'BUILD_TARGET'
         required: true
         default: 'vendorboot'
+        type: choice
+        options:
+          - vendorboot
+          - recovery
+          - boot
+      MAINTAINER:
+        description: 'MAINTAINER (nombre del mantenedor que aparecerá en el recovery y el release)'
+        required: true
+        default: 'Optimizadorww'
+      BUILD_VARIANT:
+        description: 'BUILD_VARIANT (tipo de build: user / userdebug / eng)'
+        required: true
+        default: 'eng'
+        type: choice
+        options:
+          - eng
+          - userdebug
+          - user
+      RELEASE_TYPE:
+        description: 'RELEASE_TYPE (estable / beta / testbuild)'
+        required: true
+        default: 'TestBuild'
+        type: choice
+        options:
+          - Stable
+          - Beta
+          - TestBuild
+      CLEAN_BUILD:
+        description: 'Ejecutar make clean antes de compilar'
+        required: false
+        default: false
+        type: boolean
+      UPLOAD_RELEASE:
+        description: 'Subir resultados a GitHub Releases'
+        required: false
+        default: true
+        type: boolean
+
+concurrency:
+  group: recovery-build-${{ github.event.inputs.DEVICE_NAME }}-${{ github.event.inputs.RELEASE_TYPE }}
+  cancel-in-progress: false
+
+env:
+  FOX_DIR_NAME: fox_${{ github.event.inputs.MANIFEST_BRANCH }}
 
 jobs:
   build:
     if: github.event.repository.owner.id == github.event.sender.id
     runs-on: ubuntu-24.04
+    timeout-minutes: 360
     permissions:
       contents: write
     steps:
- 
-    # You might want to Checkout your repo first, but not mandatory
-    - name: Check Out
-      uses: actions/checkout@v7
 
-    # Cleanup The Actions Workspace Using Custom Composite Run Actions
+    - name: Check Out
+      uses: actions/checkout@v4
+
     - name: Cleanup
       uses: rokibhasansagar/slimhub_actions@main
 
     - name: Initialize workspace
-      run: |
-        mkdir workspace
-        cd workspace
-        echo "workspace-folder=$(pwd)" >> $GITHUB_OUTPUT
       id: pwd
+      run: |
+        mkdir -p "$GITHUB_WORKSPACE/workspace"
+        echo "workspace-folder=$GITHUB_WORKSPACE/workspace" >> "$GITHUB_OUTPUT"
 
     - name: Prepare the build environment
+      working-directory: ${{ steps.pwd.outputs.workspace-folder }}
       run: |
-        sudo apt update && sudo apt upgrade -y
-        DEBIAN_FRONTEND=noninteractive sudo apt install -yq \
-            linux-modules-extra-$(uname -r) \
-            git python3 tar aria2
-        git clone https://gitlab.com/OrangeFox/misc/scripts
+        sudo apt-get update
+        sudo DEBIAN_FRONTEND=noninteractive apt-get install -yq \
+            git python3 tar aria2 curl zip unzip
+        git clone --depth=1 https://gitlab.com/OrangeFox/misc/scripts
         cd scripts
         sudo bash setup/android_build_env.sh
         sed -i 's/cd -/cd ../g' setup/install_android_sdk.sh
         sudo bash setup/install_android_sdk.sh
-      working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
     - name: Install OpenJDK
-      uses: actions/setup-java@v6
+      uses: actions/setup-java@v4
       with:
         distribution: 'zulu'
         java-version: '11'
 
     - name: Setup SSH Keys
-      if: ${{ startsWith(github.event.inputs.SYNC_URL, 'git@github.com') || 
-          startsWith(github.event.inputs.DEVICE_TREE_URL, 'git@github.com') ||
-          startsWith(github.event.inputs.COMMON_TREE_URL, 'git@github.com') }}
+      if: ${{ startsWith(github.event.inputs.SYNC_URL, 'git@') ||
+          startsWith(github.event.inputs.DEVICE_TREE_URL, 'git@') ||
+          startsWith(github.event.inputs.COMMON_TREE_URL, 'git@') }}
       uses: webfactory/ssh-agent@v0.9.0
       with:
-          ssh-private-key: |
-            ${{ secrets.SSH_PRIVATE_KEY }}
+        ssh-private-key: |
+          ${{ secrets.SSH_PRIVATE_KEY }}
 
-    - name: Sync OrangeFox sources and minimal manifest
+    - name: Configure git
       run: |
-        cd ${{ steps.pwd.outputs.workspace-folder }}
-        git clone ${{ github.event.inputs.SYNC_URL }}
-        cd sync
-        ./orangefox_sync.sh --branch ${{ github.event.inputs.MANIFEST_BRANCH }} --path ${{ steps.pwd.outputs.workspace-folder }}/fox_${{ github.event.inputs.MANIFEST_BRANCH }}
-      working-directory: ${{ steps.pwd.outputs.workspace-folder }}
-
-    - name: Clone device tree
-      run: |
-        cd ${{ steps.pwd.outputs.workspace-folder }}/fox_${{ github.event.inputs.MANIFEST_BRANCH }}
-        git clone ${{ github.event.inputs.DEVICE_TREE_URL }} -b ${{ github.event.inputs.DEVICE_TREE_BRANCH }} ./${{ github.event.inputs.DEVICE_PATH }}
-      working-directory: ${{ steps.pwd.outputs.workspace-folder }}
-
-    - name: Clone common tree
-      if: |
-        github.event.inputs.COMMON_TREE_URL != ''
-        && github.event.inputs.COMMON_PATH != ''
-      run: |
-        cd ${{ steps.pwd.outputs.workspace-folder }}/fox_${{ github.event.inputs.MANIFEST_BRANCH }}
-        git clone ${{ github.event.inputs.COMMON_TREE_URL }} -b ${{ github.event.inputs.DEVICE_TREE_BRANCH }} ./${{ github.event.inputs.COMMON_PATH }}
-      working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+        git config --global user.name "${{ github.event.inputs.MAINTAINER }}"
+        git config --global user.email "${{ github.actor }}@users.noreply.github.com"
+        git config --global color.ui false
 
     - name: Set Swap Space
       uses: pierotofy/set-swap-space@master
       with:
         swap-size-gb: 12
 
-    - name: Building recovery
+    - name: Sync OrangeFox sources and minimal manifest
+      working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+      env:
+        SYNC_URL: ${{ github.event.inputs.SYNC_URL }}
+        MANIFEST_BRANCH: ${{ github.event.inputs.MANIFEST_BRANCH }}
       run: |
-        cd ${{ steps.pwd.outputs.workspace-folder }}/fox_${{ github.event.inputs.MANIFEST_BRANCH }}
+        git clone "$SYNC_URL" sync
+        cd sync
+        ./orangefox_sync.sh --branch "$MANIFEST_BRANCH" --path "${{ steps.pwd.outputs.workspace-folder }}/$FOX_DIR_NAME"
+
+    - name: Clone device tree
+      working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+      env:
+        DEVICE_TREE_URL: ${{ github.event.inputs.DEVICE_TREE_URL }}
+        DEVICE_TREE_BRANCH: ${{ github.event.inputs.DEVICE_TREE_BRANCH }}
+        DEVICE_PATH: ${{ github.event.inputs.DEVICE_PATH }}
+      run: |
+        cd "$FOX_DIR_NAME"
+        git clone "$DEVICE_TREE_URL" -b "$DEVICE_TREE_BRANCH" "./$DEVICE_PATH"
+
+    - name: Clone common tree
+      if: ${{ github.event.inputs.COMMON_TREE_URL != '' && github.event.inputs.COMMON_PATH != '' }}
+      working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+      env:
+        COMMON_TREE_URL: ${{ github.event.inputs.COMMON_TREE_URL }}
+        COMMON_TREE_BRANCH: ${{ github.event.inputs.COMMON_TREE_BRANCH || github.event.inputs.DEVICE_TREE_BRANCH }}
+        COMMON_PATH: ${{ github.event.inputs.COMMON_PATH }}
+      run: |
+        cd "$FOX_DIR_NAME"
+        git clone "$COMMON_TREE_URL" -b "$COMMON_TREE_BRANCH" "./$COMMON_PATH"
+
+    - name: Building recovery
+      working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+      env:
+        MAKEFILE_NAME: ${{ github.event.inputs.MAKEFILE_NAME }}
+        BUILD_TARGET: ${{ github.event.inputs.BUILD_TARGET }}
+        BUILD_VARIANT: ${{ github.event.inputs.BUILD_VARIANT }}
+        RELEASE_TYPE: ${{ github.event.inputs.RELEASE_TYPE }}
+        MAINTAINER: ${{ github.event.inputs.MAINTAINER }}
+        CLEAN_BUILD: ${{ github.event.inputs.CLEAN_BUILD }}
+      run: |
+        cd "$FOX_DIR_NAME"
         set +e
         source build/envsetup.sh
-        export ALLOW_MISSING_DEPENDENCIES=true
         set -e
-        lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng && make clean && mka adbd ${{ github.event.inputs.BUILD_TARGET }}image -j$(nproc --all)
-      working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+
+        export ALLOW_MISSING_DEPENDENCIES=true
+        export LC_ALL="C"
+        export FOX_BUILD_TYPE="$RELEASE_TYPE"
+        export OF_MAINTAINER="$MAINTAINER"
+
+        lunch "${MAKEFILE_NAME}-${BUILD_VARIANT}"
+
+        if [ "$CLEAN_BUILD" = "true" ]; then
+          make clean
+        fi
+
+        mka adbd "${BUILD_TARGET}image" -j"$(nproc --all)"
 
     - name: Check the output directory before uploading
       run: |
-        ls -al ${{ steps.pwd.outputs.workspace-folder }}/fox_${{ github.event.inputs.MANIFEST_BRANCH }}/out/target/product/
+        OUT_BASE="${{ steps.pwd.outputs.workspace-folder }}/$FOX_DIR_NAME/out/target/product"
+        ls -al "$OUT_BASE/"
         echo
-        ls -al ${{ steps.pwd.outputs.workspace-folder }}/fox_${{ github.event.inputs.MANIFEST_BRANCH }}/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/
+        ls -al "$OUT_BASE/${{ github.event.inputs.DEVICE_NAME }}/"
+
+    - name: Collect build files
+      id: collect
+      run: |
+        OUT_DIR="${{ steps.pwd.outputs.workspace-folder }}/$FOX_DIR_NAME/out/target/product/${{ github.event.inputs.DEVICE_NAME }}"
+        mkdir -p "$GITHUB_WORKSPACE/release_files"
+        cd "$OUT_DIR"
+
+        shopt -s nullglob
+        files=(*.img *.zip)
+        if [ ${#files[@]} -eq 0 ]; then
+          echo "No se encontraron archivos .img o .zip en $OUT_DIR"
+          exit 1
+        fi
+
+        for f in "${files[@]}"; do
+          # Evita subir imágenes gigantes que no son el recovery
+          case "$f" in
+            system.img|vendor.img|product.img|super*.img|userdata.img|cache.img) continue ;;
+          esac
+          cp -v "$f" "$GITHUB_WORKSPACE/release_files/"
+        done
+
+        cd "$GITHUB_WORKSPACE/release_files"
+        sha256sum * > SHA256SUMS.txt
+        cat SHA256SUMS.txt
+
+        echo "date=$(date -u +'%Y-%m-%d %H:%M UTC')" >> "$GITHUB_OUTPUT"
+
+    - name: Generate release notes
+      env:
+        BUILD_DATE: ${{ steps.collect.outputs.date }}
+      run: |
+        {
+          echo "## ${{ github.event.inputs.DEVICE_NAME }} - OrangeFox ${{ github.event.inputs.RELEASE_TYPE }}"
+          echo
+          echo "| Campo | Valor |"
+          echo "|---|---|"
+          echo "| Mantenedor | ${{ github.event.inputs.MAINTAINER }} |"
+          echo "| Dispositivo | ${{ github.event.inputs.DEVICE_NAME }} |"
+          echo "| Tipo de release | ${{ github.event.inputs.RELEASE_TYPE }} |"
+          echo "| Tipo de build | ${{ github.event.inputs.BUILD_VARIANT }} |"
+          echo "| Target | ${{ github.event.inputs.BUILD_TARGET }} |"
+          echo "| Manifest | ${{ github.event.inputs.MANIFEST_BRANCH }} |"
+          echo "| Device tree | ${{ github.event.inputs.DEVICE_TREE_URL }} (${{ github.event.inputs.DEVICE_TREE_BRANCH }}) |"
+          echo "| Fecha | $BUILD_DATE |"
+          echo "| Run | ${{ github.run_id }} |"
+          echo
+          if [ "${{ github.event.inputs.RELEASE_TYPE }}" = "Stable" ]; then
+            echo "Versión estable."
+          elif [ "${{ github.event.inputs.RELEASE_TYPE }}" = "Beta" ]; then
+            echo "Versión beta: puede contener errores."
+          else
+            echo "Build de prueba: úsala bajo tu propio riesgo."
+          fi
+          echo
+          echo "### SHA256"
+          echo '```'
+          cat "$GITHUB_WORKSPACE/release_files/SHA256SUMS.txt"
+          echo '```'
+        } > "$GITHUB_WORKSPACE/release_notes.md"
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ github.event.inputs.DEVICE_NAME }}-${{ github.event.inputs.RELEASE_TYPE }}-${{ github.run_number }}
+        path: release_files/*
+        if-no-files-found: error
+        retention-days: 14
 
     - name: Upload to Release
+      if: ${{ github.event.inputs.UPLOAD_RELEASE == 'true' }}
       uses: softprops/action-gh-release@v2
       with:
-        files: |
-          ${{ steps.pwd.outputs.workspace-folder }}/fox_${{ github.event.inputs.MANIFEST_BRANCH }}/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.img
-          ${{ steps.pwd.outputs.workspace-folder }}/fox_${{ github.event.inputs.MANIFEST_BRANCH }}/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.zip
-        name: ${{ github.event.inputs.DEVICE_NAME }}-${{ github.run_id }}
-        tag_name: ${{ github.run_id }}
-        body: |
-          Manifest: ${{ github.event.inputs.MANIFEST_BRANCH }}
-          Device: ${{ github.event.inputs.DEVICE_NAME }}
-          Target: ${{ github.event.inputs.BUILD_TARGET }}
+        files: release_files/*
+        name: ${{ github.event.inputs.DEVICE_NAME }} ${{ github.event.inputs.RELEASE_TYPE }} - ${{ github.run_number }}
+        tag_name: ${{ github.event.inputs.DEVICE_NAME }}-${{ github.event.inputs.RELEASE_TYPE }}-${{ github.run_id }}
+        body_path: release_notes.md
+        prerelease: ${{ github.event.inputs.RELEASE_TYPE != 'Stable' }}
+        draft: false
+        fail_on_unmatched_files: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
