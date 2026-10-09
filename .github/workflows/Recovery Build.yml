@@ -1,50 +1,50 @@
-name: Recovery Build
+name: 🦊 Recovery Build
 
 on:
   workflow_dispatch:
     inputs:
       SYNC_URL:
-        description: 'SYNC_URL'
+        description: '🔗 SYNC_URL'
         required: true
         default: 'https://gitlab.com/OrangeFox/sync.git'
       MANIFEST_BRANCH:
-        description: 'MANIFEST_BRANCH'
+        description: '🌿 MANIFEST_BRANCH'
         required: true
         default: '12.1'
       DEVICE_TREE_URL:
-        description: 'DEVICE_TREE_URL'
+        description: '📱 DEVICE_TREE_URL'
         required: true
         default: 'https://github.com/Optimizadorww/recovery_device_tecno_BG7.git'
       DEVICE_TREE_BRANCH:
-        description: 'DEVICE_TREE_BRANCH'
+        description: '🌿 DEVICE_TREE_BRANCH'
         required: true
         default: 'fox-12.1'
       DEVICE_PATH:
-        description: 'DEVICE_PATH'
+        description: '📂 DEVICE_PATH'
         required: true
         default: 'device/tecno/BG7'
       COMMON_TREE_URL:
-        description: 'COMMON_TREE_URL (si no hay common tree, dejar vacío)'
+        description: '🧩 COMMON_TREE_URL (si no hay common tree, dejar vacío)'
         required: false
         default: ''
       COMMON_TREE_BRANCH:
-        description: 'COMMON_TREE_BRANCH (si no hay common tree, dejar vacío)'
+        description: '🌿 COMMON_TREE_BRANCH (si no hay common tree, dejar vacío)'
         required: false
         default: ''
       COMMON_PATH:
-        description: 'COMMON_PATH (si no hay common tree, dejar vacío)'
+        description: '📂 COMMON_PATH (si no hay common tree, dejar vacío)'
         required: false
         default: ''
       DEVICE_NAME:
-        description: 'DEVICE_NAME'
+        description: '📟 DEVICE_NAME'
         required: true
         default: 'BG7'
       MAKEFILE_NAME:
-        description: 'MAKEFILE_NAME'
+        description: '📝 MAKEFILE_NAME'
         required: true
         default: 'twrp_BG7'
       BUILD_TARGET:
-        description: 'BUILD_TARGET'
+        description: '🎯 BUILD_TARGET'
         required: true
         default: 'vendorboot'
         type: choice
@@ -53,11 +53,11 @@ on:
           - recovery
           - boot
       MAINTAINER:
-        description: 'MAINTAINER (nombre del mantenedor que aparecerá en el recovery y el release)'
+        description: '👤 MAINTAINER (nombre del mantenedor que aparecerá en el recovery y el release)'
         required: true
         default: 'Optimizadorww'
       BUILD_VARIANT:
-        description: 'BUILD_VARIANT (tipo de build: user / userdebug / eng)'
+        description: '🛠️ BUILD_VARIANT (tipo de build: user / userdebug / eng)'
         required: true
         default: 'eng'
         type: choice
@@ -66,7 +66,7 @@ on:
           - userdebug
           - user
       RELEASE_TYPE:
-        description: 'RELEASE_TYPE (estable / beta / testbuild)'
+        description: '🏷️ RELEASE_TYPE (estable / beta / testbuild)'
         required: true
         default: 'TestBuild'
         type: choice
@@ -74,13 +74,21 @@ on:
           - Stable
           - Beta
           - TestBuild
+      OFFICIAL_STATUS:
+        description: '✅ OFFICIAL_STATUS (oficial / no oficial)'
+        required: true
+        default: 'Unofficial'
+        type: choice
+        options:
+          - Official
+          - Unofficial
       CLEAN_BUILD:
-        description: 'Ejecutar make clean antes de compilar'
+        description: '🧹 Ejecutar make clean antes de compilar'
         required: false
         default: false
         type: boolean
       UPLOAD_RELEASE:
-        description: 'Subir resultados a GitHub Releases'
+        description: '🚀 Subir resultados a GitHub Releases'
         required: false
         default: true
         type: boolean
@@ -94,6 +102,7 @@ env:
 
 jobs:
   build:
+    name: 🦊 Build Recovery
     if: github.event.repository.owner.id == github.event.sender.id
     runs-on: ubuntu-24.04
     timeout-minutes: 360
@@ -101,19 +110,19 @@ jobs:
       contents: write
     steps:
 
-    - name: Check Out
+    - name: 📥 Check Out
       uses: actions/checkout@v4
 
-    - name: Cleanup
+    - name: 🧹 Cleanup
       uses: rokibhasansagar/slimhub_actions@main
 
-    - name: Initialize workspace
+    - name: 📁 Initialize workspace
       id: pwd
       run: |
         mkdir -p "$GITHUB_WORKSPACE/workspace"
         echo "workspace-folder=$GITHUB_WORKSPACE/workspace" >> "$GITHUB_OUTPUT"
 
-    - name: Prepare the build environment
+    - name: ⚙️ Prepare the build environment
       working-directory: ${{ steps.pwd.outputs.workspace-folder }}
       run: |
         sudo apt-get update
@@ -125,13 +134,13 @@ jobs:
         sed -i 's/cd -/cd ../g' setup/install_android_sdk.sh
         sudo bash setup/install_android_sdk.sh
 
-    - name: Install OpenJDK
+    - name: ☕ Install OpenJDK
       uses: actions/setup-java@v4
       with:
         distribution: 'zulu'
         java-version: '11'
 
-    - name: Setup SSH Keys
+    - name: 🔑 Setup SSH Keys
       if: ${{ startsWith(github.event.inputs.SYNC_URL, 'git@') ||
           startsWith(github.event.inputs.DEVICE_TREE_URL, 'git@') ||
           startsWith(github.event.inputs.COMMON_TREE_URL, 'git@') }}
@@ -140,18 +149,18 @@ jobs:
         ssh-private-key: |
           ${{ secrets.SSH_PRIVATE_KEY }}
 
-    - name: Configure git
+    - name: 🔧 Configure git
       run: |
         git config --global user.name "${{ github.event.inputs.MAINTAINER }}"
         git config --global user.email "${{ github.actor }}@users.noreply.github.com"
         git config --global color.ui false
 
-    - name: Set Swap Space
+    - name: 💾 Set Swap Space
       uses: pierotofy/set-swap-space@master
       with:
         swap-size-gb: 12
 
-    - name: Sync OrangeFox sources and minimal manifest
+    - name: 🔄 Sync OrangeFox sources and minimal manifest
       working-directory: ${{ steps.pwd.outputs.workspace-folder }}
       env:
         SYNC_URL: ${{ github.event.inputs.SYNC_URL }}
@@ -161,7 +170,7 @@ jobs:
         cd sync
         ./orangefox_sync.sh --branch "$MANIFEST_BRANCH" --path "${{ steps.pwd.outputs.workspace-folder }}/$FOX_DIR_NAME"
 
-    - name: Clone device tree
+    - name: 📱 Clone device tree
       working-directory: ${{ steps.pwd.outputs.workspace-folder }}
       env:
         DEVICE_TREE_URL: ${{ github.event.inputs.DEVICE_TREE_URL }}
@@ -171,7 +180,7 @@ jobs:
         cd "$FOX_DIR_NAME"
         git clone "$DEVICE_TREE_URL" -b "$DEVICE_TREE_BRANCH" "./$DEVICE_PATH"
 
-    - name: Clone common tree
+    - name: 🧩 Clone common tree
       if: ${{ github.event.inputs.COMMON_TREE_URL != '' && github.event.inputs.COMMON_PATH != '' }}
       working-directory: ${{ steps.pwd.outputs.workspace-folder }}
       env:
@@ -182,13 +191,14 @@ jobs:
         cd "$FOX_DIR_NAME"
         git clone "$COMMON_TREE_URL" -b "$COMMON_TREE_BRANCH" "./$COMMON_PATH"
 
-    - name: Building recovery
+    - name: 🦊 Building recovery
       working-directory: ${{ steps.pwd.outputs.workspace-folder }}
       env:
         MAKEFILE_NAME: ${{ github.event.inputs.MAKEFILE_NAME }}
         BUILD_TARGET: ${{ github.event.inputs.BUILD_TARGET }}
         BUILD_VARIANT: ${{ github.event.inputs.BUILD_VARIANT }}
         RELEASE_TYPE: ${{ github.event.inputs.RELEASE_TYPE }}
+        OFFICIAL_STATUS: ${{ github.event.inputs.OFFICIAL_STATUS }}
         MAINTAINER: ${{ github.event.inputs.MAINTAINER }}
         CLEAN_BUILD: ${{ github.event.inputs.CLEAN_BUILD }}
       run: |
@@ -200,6 +210,7 @@ jobs:
         export ALLOW_MISSING_DEPENDENCIES=true
         export LC_ALL="C"
         export FOX_BUILD_TYPE="$RELEASE_TYPE"
+        export FOX_OFFICIAL_STATUS="$OFFICIAL_STATUS"
         export OF_MAINTAINER="$MAINTAINER"
 
         lunch "${MAKEFILE_NAME}-${BUILD_VARIANT}"
@@ -210,14 +221,14 @@ jobs:
 
         mka adbd "${BUILD_TARGET}image" -j"$(nproc --all)"
 
-    - name: Check the output directory before uploading
+    - name: 🔍 Check the output directory before uploading
       run: |
         OUT_BASE="${{ steps.pwd.outputs.workspace-folder }}/$FOX_DIR_NAME/out/target/product"
         ls -al "$OUT_BASE/"
         echo
         ls -al "$OUT_BASE/${{ github.event.inputs.DEVICE_NAME }}/"
 
-    - name: Collect build files
+    - name: 📦 Collect build files
       id: collect
       run: |
         OUT_DIR="${{ steps.pwd.outputs.workspace-folder }}/$FOX_DIR_NAME/out/target/product/${{ github.event.inputs.DEVICE_NAME }}"
@@ -232,7 +243,6 @@ jobs:
         fi
 
         for f in "${files[@]}"; do
-          # Evita subir imágenes gigantes que no son el recovery
           case "$f" in
             system.img|vendor.img|product.img|super*.img|userdata.img|cache.img) continue ;;
           esac
@@ -245,54 +255,73 @@ jobs:
 
         echo "date=$(date -u +'%Y-%m-%d %H:%M UTC')" >> "$GITHUB_OUTPUT"
 
-    - name: Generate release notes
+    - name: 📝 Generate release notes
       env:
         BUILD_DATE: ${{ steps.collect.outputs.date }}
       run: |
+        if [ "${{ github.event.inputs.OFFICIAL_STATUS }}" = "Official" ]; then
+          STATUS_ICON="✅"
+        else
+          STATUS_ICON="⚠️"
+        fi
+
+        case "${{ github.event.inputs.RELEASE_TYPE }}" in
+          Stable)    TYPE_ICON="🟢" ;;
+          Beta)      TYPE_ICON="🟡" ;;
+          *)         TYPE_ICON="🧪" ;;
+        esac
+
         {
-          echo "## ${{ github.event.inputs.DEVICE_NAME }} - OrangeFox ${{ github.event.inputs.RELEASE_TYPE }}"
+          echo "## 🦊 ${{ github.event.inputs.DEVICE_NAME }} - OrangeFox ${{ github.event.inputs.RELEASE_TYPE }} ($STATUS_ICON ${{ github.event.inputs.OFFICIAL_STATUS }})"
           echo
-          echo "| Campo | Valor |"
+          echo "| 📋 Campo | Valor |"
           echo "|---|---|"
-          echo "| Mantenedor | ${{ github.event.inputs.MAINTAINER }} |"
-          echo "| Dispositivo | ${{ github.event.inputs.DEVICE_NAME }} |"
-          echo "| Tipo de release | ${{ github.event.inputs.RELEASE_TYPE }} |"
-          echo "| Tipo de build | ${{ github.event.inputs.BUILD_VARIANT }} |"
-          echo "| Target | ${{ github.event.inputs.BUILD_TARGET }} |"
-          echo "| Manifest | ${{ github.event.inputs.MANIFEST_BRANCH }} |"
-          echo "| Device tree | ${{ github.event.inputs.DEVICE_TREE_URL }} (${{ github.event.inputs.DEVICE_TREE_BRANCH }}) |"
-          echo "| Fecha | $BUILD_DATE |"
-          echo "| Run | ${{ github.run_id }} |"
+          echo "| 👤 Mantenedor | ${{ github.event.inputs.MAINTAINER }} |"
+          echo "| 📟 Dispositivo | ${{ github.event.inputs.DEVICE_NAME }} |"
+          echo "| $TYPE_ICON Tipo de release | ${{ github.event.inputs.RELEASE_TYPE }} |"
+          echo "| $STATUS_ICON Estado | ${{ github.event.inputs.OFFICIAL_STATUS }} |"
+          echo "| 🛠️ Tipo de build | ${{ github.event.inputs.BUILD_VARIANT }} |"
+          echo "| 🎯 Target | ${{ github.event.inputs.BUILD_TARGET }} |"
+          echo "| 🌿 Manifest | ${{ github.event.inputs.MANIFEST_BRANCH }} |"
+          echo "| 📱 Device tree | ${{ github.event.inputs.DEVICE_TREE_URL }} (${{ github.event.inputs.DEVICE_TREE_BRANCH }}) |"
+          echo "| 📅 Fecha | $BUILD_DATE |"
+          echo "| 🔢 Run | ${{ github.run_id }} |"
           echo
           if [ "${{ github.event.inputs.RELEASE_TYPE }}" = "Stable" ]; then
-            echo "Versión estable."
+            echo "🟢 Versión estable."
           elif [ "${{ github.event.inputs.RELEASE_TYPE }}" = "Beta" ]; then
-            echo "Versión beta: puede contener errores."
+            echo "🟡 Versión beta: puede contener errores."
           else
-            echo "Build de prueba: úsala bajo tu propio riesgo."
+            echo "🧪 Build de prueba: úsala bajo tu propio riesgo."
           fi
           echo
-          echo "### SHA256"
+          if [ "${{ github.event.inputs.OFFICIAL_STATUS }}" = "Official" ]; then
+            echo "✅ Build oficial."
+          else
+            echo "⚠️ Build no oficial."
+          fi
+          echo
+          echo "### 🔐 SHA256"
           echo '```'
           cat "$GITHUB_WORKSPACE/release_files/SHA256SUMS.txt"
           echo '```'
         } > "$GITHUB_WORKSPACE/release_notes.md"
 
-    - name: Upload artifacts
+    - name: ☁️ Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ github.event.inputs.DEVICE_NAME }}-${{ github.event.inputs.RELEASE_TYPE }}-${{ github.run_number }}
+        name: ${{ github.event.inputs.DEVICE_NAME }}-${{ github.event.inputs.RELEASE_TYPE }}-${{ github.event.inputs.OFFICIAL_STATUS }}-${{ github.run_number }}
         path: release_files/*
         if-no-files-found: error
         retention-days: 14
 
-    - name: Upload to Release
+    - name: 🚀 Upload to Release
       if: ${{ github.event.inputs.UPLOAD_RELEASE == 'true' }}
       uses: softprops/action-gh-release@v2
       with:
         files: release_files/*
-        name: ${{ github.event.inputs.DEVICE_NAME }} ${{ github.event.inputs.RELEASE_TYPE }} - ${{ github.run_number }}
-        tag_name: ${{ github.event.inputs.DEVICE_NAME }}-${{ github.event.inputs.RELEASE_TYPE }}-${{ github.run_id }}
+        name: 🦊 ${{ github.event.inputs.DEVICE_NAME }} ${{ github.event.inputs.RELEASE_TYPE }} (${{ github.event.inputs.OFFICIAL_STATUS }}) - ${{ github.run_number }}
+        tag_name: ${{ github.event.inputs.DEVICE_NAME }}-${{ github.event.inputs.RELEASE_TYPE }}-${{ github.event.inputs.OFFICIAL_STATUS }}-${{ github.run_id }}
         body_path: release_notes.md
         prerelease: ${{ github.event.inputs.RELEASE_TYPE != 'Stable' }}
         draft: false
