@@ -57,7 +57,7 @@ on:
         required: true
         default: 'Optimizadorww'
       BUILD_VARIANT:
-        description: '🛠️ BUILD_VARIANT (tipo de build: user / userdebug / eng)'
+        description: '🛠️ BUILD_VARIANT (user / userdebug / eng)'
         required: true
         default: 'eng'
         type: choice
@@ -82,6 +82,11 @@ on:
         options:
           - Official
           - Unofficial
+      FORCE_USER_BUILD:
+        description: '🔒 FORCE_USER_BUILD (solo si BUILD_VARIANT=user: true = parchea sepolicy y compila user, false = usa userdebug)'
+        required: false
+        default: false
+        type: boolean
       CLEAN_BUILD:
         description: '🧹 Ejecutar make clean antes de compilar'
         required: false
@@ -191,6 +196,31 @@ jobs:
         cd "$FOX_DIR_NAME"
         git clone "$COMMON_TREE_URL" -b "$COMMON_TREE_BRANCH" "./$COMMON_PATH"
 
+    - name: 🩹 Patch sepolicy (permitir dominios permissive en build user)
+      if: ${{ github.event.inputs.BUILD_VARIANT == 'user' && github.event.inputs.FORCE_USER_BUILD == 'true' }}
+      working-directory: ${{ steps.pwd.outputs.workspace-folder }}
+      run: |
+        cd "$FOX_DIR_NAME/system/sepolicy"
+
+        # Localiza los archivos que contienen el chequeo de AOSP
+        FILES=$(grep -rlF "permissive domains not allowed in user builds" . --include='*.mk' --include='Android.mk' || true)
+
+        if [ -z "$FILES" ]; then
+          echo "::error::No se encontró el chequeo de dominios permissive en system/sepolicy"
+          exit 1
+        fi
+
+        for f in $FILES; do
+          echo "Parcheando $f"
+          sed -i 's/= "user" -a -s/= "never" -a -s/g' "$f"
+        done
+
+        echo "Verificación:"
+        grep -rn '= "never" -a -s' . --include='*.mk' --include='Android.mk' || {
+          echo "::error::El parche no se aplicó, revisa el patrón del chequeo"
+          exit 1
+        }
+
     - name: 🦊 Building recovery
       working-directory: ${{ steps.pwd.outputs.workspace-folder }}
       env:
@@ -201,6 +231,7 @@ jobs:
         OFFICIAL_STATUS: ${{ github.event.inputs.OFFICIAL_STATUS }}
         MAINTAINER: ${{ github.event.inputs.MAINTAINER }}
         CLEAN_BUILD: ${{ github.event.inputs.CLEAN_BUILD }}
+        FORCE_USER_BUILD: ${{ github.event.inputs.FORCE_USER_BUILD }}
       run: |
         cd "$FOX_DIR_NAME"
         set +e
@@ -213,7 +244,16 @@ jobs:
         export FOX_OFFICIAL_STATUS="$OFFICIAL_STATUS"
         export OF_MAINTAINER="$MAINTAINER"
 
-        lunch "${MAKEFILE_NAME}-${BUILD_VARIANT}"
+        # Los builds "user" rechazan dominios permissive (adbd, fastbootd, recovery, init...).
+        # Si FORCE_USER_BUILD=true el paso anterior ya parcheó sepolicy; si no, se usa userdebug.
+        EFFECTIVE_VARIANT="$BUILD_VARIANT"
+        if [ "$BUILD_VARIANT" = "user" ] && [ "$FORCE_USER_BUILD" != "true" ]; then
+          echo "::warning::El variant 'user' no permite dominios permissive en recovery. Usando 'userdebug'."
+          EFFECTIVE_VARIANT="userdebug"
+        fi
+        echo "EFFECTIVE_VARIANT=$EFFECTIVE_VARIANT" >> "$GITHUB_ENV"
+
+        lunch "${MAKEFILE_NAME}-${EFFECTIVE_VARIANT}"
 
         if [ "$CLEAN_BUILD" = "true" ]; then
           make clean
@@ -280,7 +320,7 @@ jobs:
           echo "| 📟 Dispositivo | ${{ github.event.inputs.DEVICE_NAME }} |"
           echo "| $TYPE_ICON Tipo de release | ${{ github.event.inputs.RELEASE_TYPE }} |"
           echo "| $STATUS_ICON Estado | ${{ github.event.inputs.OFFICIAL_STATUS }} |"
-          echo "| 🛠️ Tipo de build | ${{ github.event.inputs.BUILD_VARIANT }} |"
+          echo "| 🛠️ Tipo de build | ${EFFECTIVE_VARIANT:-${{ github.event.inputs.BUILD_VARIANT }}} |"
           echo "| 🎯 Target | ${{ github.event.inputs.BUILD_TARGET }} |"
           echo "| 🌿 Manifest | ${{ github.event.inputs.MANIFEST_BRANCH }} |"
           echo "| 📱 Device tree | ${{ github.event.inputs.DEVICE_TREE_URL }} (${{ github.event.inputs.DEVICE_TREE_BRANCH }}) |"
