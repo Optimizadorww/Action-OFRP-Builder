@@ -323,7 +323,6 @@ jobs:
           echo "| 🛠️ Tipo de build | ${EFFECTIVE_VARIANT:-${{ github.event.inputs.BUILD_VARIANT }}} |"
           echo "| 🎯 Target | ${{ github.event.inputs.BUILD_TARGET }} |"
           echo "| 🌿 Manifest | ${{ github.event.inputs.MANIFEST_BRANCH }} |"
-          echo "| 📱 Device tree | ${{ github.event.inputs.DEVICE_TREE_URL }} (${{ github.event.inputs.DEVICE_TREE_BRANCH }}) |"
           echo "| 📅 Fecha | $BUILD_DATE |"
           echo "| 🔢 Run | ${{ github.run_id }} |"
           echo
